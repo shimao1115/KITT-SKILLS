@@ -2,5 +2,24 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "kitt",
   "version": "0.2.0",
-  "description": "KITT / 沿途: a grounded, location-aware AI travel co-driver that researches local chapters into source-preserving dossiers, speaks freely when there is something worth hearing, answers user questions with on-demand search when needed, and never lets background research globally mute the journey."
+  "description": "KITT / 沿途: a grounded, location-aware AI travel co-driver that researches local chapters into source-preserving dossiers, speaks freely when there is something worth hearing, answers user questions with on-demand search when needed, and never lets background research globally mute the journey.",
+  "author": {
+    "name": "shimao1115"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "沿途 KITT",
+        "shortDescription": "会读懂沿途世界的 AI 副驾驶",
+        "longDescription": "把 KITT 的沿途理解、Local Dossier、事实查证、主动讲述与用户接管规则带进 ChatGPT。适合自驾、旅行、沿途看见某物、询问正在经过的地方，以及需要按当前位置理解当地世界的场景。",
+        "developerName": "shimao1115",
+        "capabilities": ["Interactive"],
+        "defaultPrompt": [
+          "KITT，开始沿途。先根据你现在能获得的现场信息判断我在哪里；没有依据的地方不要猜。",
+          "KITT，根据我现在的位置，讲一个这里真正值得知道的东西。",
+          "KITT，帮我查一下我附近有什么真正值得去或值得了解的地方。"
+        ]
+      }
+    }
+  }
 }
