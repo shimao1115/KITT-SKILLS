@@ -1,6 +1,6 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "kitt",
-  "version": "0.1.0",
-  "description": "KITT (路上读山河): a location-aware AI travel companion and co-driver that knows when to speak, what to explain, when to verify facts, and when to stay quiet."
+  "version": "0.2.0",
+  "description": "KITT / 沿途: a grounded, location-aware AI travel co-driver that researches local chapters into source-preserving dossiers, speaks freely when there is something worth hearing, answers user questions with on-demand search when needed, and never lets background research globally mute the journey."
 }

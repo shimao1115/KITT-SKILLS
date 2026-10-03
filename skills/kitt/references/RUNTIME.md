@@ -1,39 +1,42 @@
 # KITT Runtime Contract
 
-Only read this file when KITT is hosted by a process that can repeatedly provide live context, or when the user explicitly asks to build/run KITT in the background.
+仅当 KITT 被一个能持续提供位置/事件的宿主运行，或用户明确要让 KITT 后台运行时，读取本文件。
 
-This is intentionally a **thin contract**, not a server architecture.
+这是一个 **薄 Runtime 契约**，不是服务器架构。
 
-## 1. Boundary
+## 1. 边界
 
-The Skill itself cannot remain alive in the background.
+Skill 自己不会常驻后台。
 
-A host/runtime is responsible for:
+宿主 / Runtime 负责：
 
-- receiving GPS or other location updates;
-- receiving optional photos or user speech/text;
-- deciding when there is enough new information to wake the model;
-- executing timers such as quiet mode;
-- playing TTS / collecting STT when available;
-- persisting only the minimal session state the product actually needs.
+- 接收 GPS / 最近位置与必要的移动趋势；
+- 解析或提供可靠的地方章节身份；
+- 接收可选照片、用户语音/文字；
+- 执行安静计时等确定性状态；
+- 在需要时调用搜索/研究能力；
+- 播放 TTS、收集 STT（若宿主支持）；
+- 保存本次旅程真正需要的最小 session 状态；
+- 在出现足够新信息时唤醒 KITT。
 
-KITT is responsible for:
+KITT 负责：
 
-- understanding the current scene;
-- deciding whether to speak;
-- selecting the topic;
-- deciding whether verification is needed;
-- explaining;
-- responding to the user;
-- asking one useful question when asking is better than guessing.
+- 理解现场；
+- 判断是否值得开口；
+- 从 Local Dossier / 已有可靠依据中自由选择内容；
+- 判断用户问题是否需要新搜索；
+- 解释、讲述与回答；
+- 必要时问一个比猜测更有价值的问题。
 
-Do not build a large workflow engine merely to host this Skill.
+不要为了托管这个 Skill 建大型工作流引擎。
 
-## 2. Minimal Context Card
+---
 
-Raw sensor streams should be compressed before reaching KITT.
+## 2. 最小 Context Card
 
-Use natural-language fields and omit unavailable ones:
+原始传感器流应先压缩成人类可理解的现场摘要。
+
+字段可缺失：
 
 ```text
 【旅程意图】
@@ -42,35 +45,109 @@ Use natural-language fields and omit unavailable ones:
 
 【当前位置】
 最近已知位置：
-区域/道路：
+省 / 市 / 区县 / 镇乡街道：
+道路：
 方向：
 速度：
 海拔：
 近期变化趋势：
 
-【附近/前方可靠线索】
-...
+【当前章节】
+chapter_id：
+状态：RESEARCHING | READY_UNCHECKED | CHECKED | FAILED
+是否仍在章节：
+Local Dossier 摘要：
+主要 provenance / source refs：
+
+【独立现场机会】
+重要地标/河流/山峰/桥隧/遗址等：
+可靠接近依据：
 
 【最近讲过】
 - ...
 
 【当前交互状态】
-距上次自动旁白：
 刚才是否被跳过：
 是否安静：
+是否正在说话/监听/看图：
 是否刚结束主动对话：
 
 【用户刚刚说】
 ...
 ```
 
-Do not require every field.
+不要要求每个字段都有值。
 
-Destination is an intention, not a claimed navigation route.
+目的地只是旅程意图，不是导航路线。
 
-## 3. Four actions
+---
 
-When the host explicitly requests structured Runtime output, return exactly one current action:
+## 3. Local Dossier lifecycle
+
+新解析出的镇 / 乡 / 街道章节，应建立本次旅程的章节研究状态。
+
+推荐的最小语义：
+
+- **RESEARCHING**：实际搜索正在进行；
+- **READY_UNCHECKED**：已有带来源的 Local Dossier，但 Director 还没真正检查这次章节机会；
+- **CHECKED**：该章节机会已经实际检查过；
+- **FAILED**：研究失败或没有形成可验证事实包。
+
+关键规则：
+
+1. 章节研究可以异步。
+2. RESEARCHING **不能全局阻塞** Director、用户交互或移动。
+3. READY_UNCHECKED 在用户仍处于章节时，应保留到一次真正的 Director 检查，不因 TTS / 监听 / 看图 / 普通冷却被无声吃掉。
+4. FAILED 不是“可以用模型记忆补齐”，而是“没有 Local Dossier”。
+5. 驶离后才 READY / FAILED，不为旧章节补播。
+6. 可以缓存本次旅程的证据，但不要维护永久地方知识库。
+7. 不要维护旁白队列；保留的是 **未检查的现场机会**，不是待播文本。
+
+如果宿主已有搜索工具，复用它；不要为了 Local Dossier 另造第二套 web 系统。
+
+---
+
+## 4. 研究等待期间仍允许什么
+
+研究 pending 时，KITT 仍可：
+
+- 响应用户文字 / 语音；
+- 做必要的 ASK_USER；
+- 解释稳定的一般机制；
+- 使用已有可靠依据的独立地标内容；
+- 使用已经 READY 的更高层级背景；
+- 继续处理不依赖该章节当地事实的内容。
+
+研究 pending / failed 时，KITT 不可：
+
+- 编造该章节具体当地事实；
+- 声称“已经搜索/查到”；
+- 用模型记忆伪装成搜索结果；
+- 永久阻塞后续 Director 检查。
+
+---
+
+## 5. 用户主动按需搜索
+
+对用户主动问题，先判断：
+
+- 当前 Context + Local Dossier 已足够 → 直接回答；
+- 稳定一般常识且高置信 → 可直接回答；
+- 当地具体事实缺少可靠依据 → 搜索；
+- 用户明确要求查/搜/找 → 搜索；
+- 开放、活动、新闻、天气、交通、临时关闭、当前状态等时效问题 → 搜索。
+
+搜索结果应保留必要 provenance。
+
+用户主动搜索只是当前旅程的临时分支：回答结束后回到原章节与旅程，不创建第二个会话系统，不自动排队一段无关旁白。
+
+“附近”查询可用当前位置做 grounding；没有路线/地图数据时，不输出假方向、假距离或假行程时间。
+
+---
+
+## 6. Four actions
+
+当宿主要求结构化 Runtime 输出时，每次只返回一个当前动作：
 
 ```json
 {
@@ -85,105 +162,126 @@ When the host explicitly requests structured Runtime output, return exactly one 
 
 ### SILENT
 
-Nothing is currently worth interrupting the quiet for.
+当前没有足够理由开口，或用户/安静/事实边界要求保持安静。
 
 ### SPEAK_NOW
 
-Speak now.
+现在值得讲。
 
-- `topic`: the single cognitive topic.
-- `narration`: complete spoken text.
-- `memory_update`: a very short “already covered” summary.
+- `topic`：本次主要内容；
+- `narration`：可直接交给 TTS 的完整文本；
+- `memory_update`：极短的“刚讲过什么”。
+
+不要要求 narration 遵守固定作文模板。
 
 ### PREPARE
 
-A small number of time-sensitive upcoming subjects may deserve advance verification or organization, but should not be spoken yet.
+只用于少数明显“错过现场会显著减值”的前方节点。
 
-Rules:
-
-- at most one PREPARE at a time;
-- bind it to a clear scene/target;
-- `prepare_hint` describes what to re-check, not a precise countdown;
-- when the scene changes, re-evaluate with fresh context;
-- if passed, deviated from, invalidated by new user intent, or crossed during quiet mode, discard it;
-- never replay stale “you just passed...” content because it was previously prepared.
-
-PREPARE is a one-time scene reservation, not a speech cache.
+- 同时最多一个；
+- 绑定明确目标；
+- `prepare_hint` 写重新确认条件，不写精确秒数；
+- 接近时用新现场重新判断；
+- 已驶过 / 偏离 / 被新用户意图覆盖 / 安静期间错过 → 删除；
+- 不缓存待播旁白。
 
 ### ASK_USER
 
-Ask one short question because asking is materially better than guessing.
+问一个短问题，因为问比猜更可靠。
 
-- `question` should be natural and worth answering.
-- If the user does not answer, abandon it.
-- Do not repeatedly prompt.
+没有回答就放弃，不重复催促。
 
-## 4. Wake-up semantics
+---
 
-Sensors may run frequently; the model should not.
+## 7. Wake-up semantics
 
-Reasonable wake-up events include:
+传感器可以高频，模型不需要高频。
 
-- materially changed location/road/environment summary;
-- enough elapsed distance/time after a prior narration;
-- a PREPARE target may be approaching;
-- the user speaks;
-- the user ends quiet mode;
-- the user changes destination or session preference;
-- a new photo arrives.
+合理的唤醒理由包括：
 
-These are reasons to **check**, not rules that force speech.
+- 新镇 / 乡 / 街道章节出现；
+- 当前章节 Local Dossier 从 RESEARCHING 变为 READY_UNCHECKED / FAILED；
+- 高显著性独立地标进入可靠接近范围；
+- 位置 / 道路 / 环境摘要发生实质变化；
+- 用户主动说话；
+- 用户结束安静；
+- 用户改变目的地或旅程偏好；
+- 新照片到达；
+- PREPARE 目标需要重新确认。
 
-No new information → no model call is usually the right behavior.
+这些都是 **检查机会**，不是强制播音规则。
 
-## 5. Priority
+新章节若有可靠、值得听的材料，应给 SPEAK_NOW 强偏好；高显著性地标可绕过普通冷却。仍然服从用户、安静、过时、去重与安全边界。
 
-Highest to lowest:
+---
 
-1. latest explicit user action or speech;
-2. explicit quiet mode;
-3. active user conversation;
-4. brief post-conversation breathing room;
-5. a one-shot ASK_USER response window;
-6. mature SPEAK_NOW / PREPARE;
-7. SILENT.
+## 8. Priority
 
-Do not maintain a narration queue.
+从高到低：
 
-At most keep:
+1. 最新用户主动操作 / 说话；
+2. 明确安静模式；
+3. 正在进行的主动对话；
+4. ASK_USER 的一次回答窗口；
+5. 新章节 READY_UNCHECKED / 高显著性现场机会；
+6. 其他自动检查；
+7. SILENT。
 
-- what is currently being handled/spoken;
-- one not-yet-mature PREPARE.
+不要维护旁白队列。
 
-## 6. Failure semantics
+运行时最多保留必要的现场状态，例如：
 
-Automatic model/search failure should normally degrade to **SILENT**.
+- 当前正在处理/播放的一段；
+- 一个 PREPARE；
+- 当前章节的研究/检查状态；
+- 少量独立地标机会。
 
-Do not turn connection failures into driving events or retry storms.
+---
 
-For an active user request, briefly say the request could not be completed. One inexpensive retry is acceptable for an obviously transient failure.
+## 9. Failure semantics
 
-## 7. Minimal persistent state
+自动模型或研究失败不应变成驾驶事件。
 
-A Runtime may keep:
+研究失败：
 
-- journey intent;
-- short Session Instructions;
-- recent topics;
-- one PREPARE;
-- quiet state/timer;
-- a compact recent movement summary.
+- 明确记为 FAILED；
+- 不伪造当地事实；
+- 不因此永久静默；
+- 允许用户交互与已有可靠内容继续工作。
 
-Do not require:
+主动请求失败：
 
-- full GPS history;
-- full transcript;
-- raw recordings;
-- vector database;
-- RAG;
-- multi-agent orchestration;
-- a backend server unless the actual host requires one.
+- 简短告诉用户暂时没查到/没连上；
+- 不把失败包装成成功；
+- 不制造重试风暴。
 
-The design rule is:
+---
 
-> **Trust the AI capability; verify the outcome. Add deterministic machinery only where reality requires it.**
+## 10. 最小持久状态
+
+本次旅程最多需要：
+
+- journey intent；
+- 短 Session Instructions；
+- 最近主题；
+- 当前章节身份与 RESEARCHING / READY_UNCHECKED / CHECKED / FAILED 状态；
+- session Local Dossier 的紧凑事实与来源；
+- 少量独立现场机会；
+- 一个 PREPARE；
+- quiet 状态/计时；
+- 紧凑移动摘要。
+
+默认不需要：
+
+- 完整 GPS 历史；
+- 完整对话；
+- 原始录音 / 原始图片；
+- 原始网页历史；
+- 向量数据库；
+- RAG；
+- 多 Agent 编排；
+- 为未来假设准备的后台服务器。
+
+设计原则：
+
+> **Trust the AI capability; verify the outcome. 只在现实真正需要确定性时增加代码。**
